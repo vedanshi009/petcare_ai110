@@ -4,6 +4,7 @@
 
 **a. Initial design**
 
+Three core actions that a user should be able to perform include adding multiple pets, remove pets and define recurring tasks for the pets like walking bathing etc.
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
