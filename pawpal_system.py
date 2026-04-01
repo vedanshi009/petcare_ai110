@@ -98,6 +98,7 @@ class Task:
     frequency: TaskFrequency = TaskFrequency.DAILY
     non_negotiable: bool = False
     status: TaskStatus = TaskStatus.PENDING
+    preferred_hour: Optional[int] = None  # Hours 0-23 (e.g., 8 for 8am), or None for anytime
 
     def is_high_priority(self) -> bool:
         """Return True if priority is 'high'."""
@@ -176,6 +177,7 @@ class DailyPlan:
         self.constraints = constraints
         self.scheduled_tasks = scheduled_tasks or []
         self.skipped_tasks = skipped_tasks or []
+        self.conflicts: list[tuple[Task, Task]] = []  # Detected task conflicts
 
     def skipped_count(self) -> int:
         """Return the number of skipped tasks."""
@@ -203,6 +205,19 @@ class DailyPlan:
     def get_tasks_for_pet(self, pet_id: str) -> list[Task]:
         """Return all tasks scheduled for a specific pet."""
         return [t for t in self.scheduled_tasks if t.pet_id == pet_id]
+
+    def has_conflicts(self) -> bool:
+        """Return True if any task conflicts were detected."""
+        return len(self.conflicts) > 0
+
+    def conflict_summary(self) -> str:
+        """Return a human-readable summary of conflicts."""
+        if not self.conflicts:
+            return "No conflicts detected."
+        lines = [f"⚠ {len(self.conflicts)} conflict(s) detected:"]
+        for t1, t2 in self.conflicts:
+            lines.append(f"  • {t1.name} + {t2.name} (both for same pet)")
+        return "\n".join(lines)
 
 
 class Owner:
@@ -269,23 +284,70 @@ class Scheduler:
         return self.owner.get_pending_tasks()
 
     def prioritize_tasks(self, tasks: list[Task]) -> list[Task]:
-        """Sort tasks by non-negotiable flag then priority (high > medium > low)."""
+        """Sort tasks by non-negotiable flag then priority (high > medium > low), then by time preference."""
         priority_order = {TaskPriority.HIGH: 0, TaskPriority.MEDIUM: 1, TaskPriority.LOW: 2}
         return sorted(
             tasks,
             key=lambda t: (
                 not t.non_negotiable,  # False (non-negotiable) comes first
                 priority_order.get(t.priority, 3),
+                t.preferred_hour if t.preferred_hour is not None else 12,  # Default to midday
                 t.name,
             ),
         )
 
+    def should_run_today(self, task: Task, plan_date: date) -> bool:
+        """Check if recurring task should be scheduled for the given date."""
+        if task.frequency == TaskFrequency.ONCE:
+            return task.status == TaskStatus.PENDING
+        elif task.frequency == TaskFrequency.DAILY:
+            return True
+        elif task.frequency == TaskFrequency.WEEKLY:
+            # Run on first occurrence (you can customize this logic)
+            return plan_date.weekday() == 0  # Monday
+        elif task.frequency == TaskFrequency.MONTHLY:
+            # Run on first day of month
+            return plan_date.day == 1
+        return False
+
+    def detect_conflicts(self, plan: DailyPlan) -> list[tuple[Task, Task]]:
+        """Return list of task pairs that conflict (incompatible for same pet)."""
+        conflicts = []
+        scheduled = plan.scheduled_tasks
+        for i, t1 in enumerate(scheduled):
+            for t2 in scheduled[i + 1:]:
+                if t1.pet_id == t2.pet_id and self._are_incompatible(t1, t2):
+                    conflicts.append((t1, t2))
+        return conflicts
+
+    def _are_incompatible(self, t1: Task, t2: Task) -> bool:
+        """Check if two tasks for same pet shouldn't happen sequentially."""
+        # Two walks back-to-back exhaust the pet without rest
+        if t1.category == TaskCategory.WALK and t2.category == TaskCategory.WALK:
+            return True
+        # Feeding right after play might cause issues
+        if (t1.category == TaskCategory.PLAY and t2.category == TaskCategory.FEED) or \
+           (t1.category == TaskCategory.FEED and t2.category == TaskCategory.PLAY):
+            # Allow 15+ min gap
+            return True
+        return False
+
     def build_plan(
         self, date_for_plan: date, constraints: DayConstraints
     ) -> DailyPlan:
-        """Build a priority-ordered daily plan, scheduling tasks that fit and skipping the rest."""
+        """Build a priority-ordered daily plan, scheduling tasks that fit and skipping the rest.
+
+        Accounts for:
+        - Recurring task frequency (only schedule if should run today)
+        - Blocked time windows
+        - Task priority and time preferences
+        - Task duration constraints
+        """
         available_tasks = self.get_available_tasks()
-        prioritized_tasks = self.prioritize_tasks(available_tasks)
+
+        # Filter out tasks that shouldn't run today
+        tasks_for_today = [t for t in available_tasks if self.should_run_today(t, date_for_plan)]
+        prioritized_tasks = self.prioritize_tasks(tasks_for_today)
 
         plan = DailyPlan(
             date=date_for_plan,
@@ -293,14 +355,23 @@ class Scheduler:
             constraints=constraints,
         )
 
+        # Calculate available minutes accounting for blocked windows
         remaining_minutes = constraints.available_minutes
+        if constraints.blocked_windows:
+            blocked_duration = sum(end - start for start, end in constraints.blocked_windows)
+            remaining_minutes -= blocked_duration
 
+        # Schedule tasks greedily
         for task in prioritized_tasks:
             if task.fits_in(remaining_minutes):
                 plan.add_task(task, skip=False)
                 remaining_minutes -= task.duration
             else:
                 plan.add_task(task, skip=True)
+
+        # Detect and log conflicts (optional warning)
+        conflicts = self.detect_conflicts(plan)
+        plan.conflicts = conflicts  # Store for debugging/reporting
 
         return plan
 

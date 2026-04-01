@@ -7,11 +7,27 @@
 Three core actions that a user should be able to perform include adding multiple pets, remove pets and define recurring tasks for the pets like walking bathing etc.
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+Some objects in this system could be as follows:
+Pet:
+Attributes: id, name, species, age, health_notes, weight
+Methods: age_label(), has_health_notes()
+Task:
+Attributes: id,name, category, priority, duration, non_negotiable
+Methods: is_high_priority(), fits_in(minutes), summary()
+DailyPlan:
+Attributes: date, scheduled_tasks[],skipped_tasks[]
+Methods: skipped_count(), scheduled_count()
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+I made some changes based on the AI feedback, some of them include:
+1. Added DayConstraints relationship to DailyPlan which was missing earlier so that Scheduler can validate that scheduled tasks fit within available_minutes
+2. Typed blocked_windows as list[Tuple[int, int]] instead of generic list as Scheduler needs to know exact structure to check time conflicts and as Generic list type is too vague and error-prone
+3. Added two new methods: total_scheduled_minutes() and is_valid(), to prevent scheduler from creating plans that exceed available_minutes and enable early testing & debugging of scheduling logic
+
+Later I made other changes, based on the main classes given in the instructions, so the code in the pawpal_systems.py file was restructured. 
 
 ---
 

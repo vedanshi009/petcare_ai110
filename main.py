@@ -4,7 +4,7 @@ Run with: python main.py
 """
 
 from datetime import date
-from pawpal_system_new import (
+from pawpal_system import (
     Owner, Pet, Task,
     TaskCategory, TaskPriority, TaskFrequency,
     DayConstraints, EnergyLevel, Scheduler,
@@ -39,18 +39,19 @@ def main():
     # ── Tasks — Dog ──────────────────────────────────────────────────────────
     dog.add_task(Task("t001", "Morning Walk",  "1-hour park walk",
                       TaskCategory.WALK,         TaskPriority.HIGH,   60, dog.id,
-                      TaskFrequency.DAILY, non_negotiable=True))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_hour=8))
 
     dog.add_task(Task("t002", "Breakfast",     "Kibble and fresh water",
                       TaskCategory.FEED,         TaskPriority.HIGH,   15, dog.id,
-                      TaskFrequency.DAILY, non_negotiable=True))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_hour=7))
 
     dog.add_task(Task("t003", "Play Session",  "Fetch in backyard",
-                      TaskCategory.PLAY,         TaskPriority.MEDIUM, 30, dog.id))
+                      TaskCategory.PLAY,         TaskPriority.MEDIUM, 30, dog.id,
+                      preferred_hour=14))
 
     dog.add_task(Task("t004", "Grooming",      "Brush fur, check for parasites",
                       TaskCategory.GROOM,        TaskPriority.MEDIUM, 20, dog.id,
-                      TaskFrequency.WEEKLY))
+                      TaskFrequency.WEEKLY, preferred_hour=10))
 
     # ── Tasks — Cat ──────────────────────────────────────────────────────────
     cat.add_task(Task("t005", "Breakfast",     "Wet food",
@@ -85,7 +86,7 @@ def main():
     print(f"Pets  : {owner.pet_count()}")
     print(f"Tasks : {owner.total_task_count()} total")
     for pet in owner.pets:
-        note = f"  ⚠  {pet.health_notes}" if pet.health_notes else ""
+        note = f"  [!] {pet.health_notes}" if pet.health_notes else ""
         print(f"  {pet.name:10} {pet.species:8} {pet.age_label():8} "
               f"{pet.task_count()} tasks{note}")
 
@@ -100,8 +101,9 @@ def main():
     # ── Build plan ───────────────────────────────────────────────────────────
     constraints = DayConstraints(
         available_minutes=480,
+        blocked_windows=[(120, 180)],  # 2pm-3pm blocked (meeting, etc.)
         energy_level=EnergyLevel.NORMAL,
-        special_notes="Standard day — all pets healthy",
+        special_notes="Standard day — all pets healthy (blocked 2-3pm)",
     )
 
     scheduler = Scheduler(owner)
@@ -133,6 +135,13 @@ def main():
     used = plan.total_scheduled_minutes()
     print(f"  Scheduled : {plan.scheduled_count()} tasks  |  {used} min used  |  "
           f"{constraints.available_minutes - used} min remaining")
+
+    # Show conflicts if any detected
+    if plan.has_conflicts():
+        print(f"\n  [CONFLICTS DETECTED]:")
+        for t1, t2 in plan.conflicts:
+            pet = owner.get_pet(t1.pet_id)
+            print(f"    • {pet.name}: '{t1.name}' + '{t2.name}' may cause issues")
 
     if plan.skipped_tasks:
         print(f"\n  Deferred ({plan.skipped_count()} tasks):")
