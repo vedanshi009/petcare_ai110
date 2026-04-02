@@ -35,15 +35,23 @@ Later I made other changes, based on the main classes given in the instructions,
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers several constraints when building daily plans:
+- **Time availability**: Tasks must fit within the owner's available minutes for the day, accounting for blocked time windows
+- **Task priority**: High-priority tasks are scheduled before medium or low priority ones
+- **Non-negotiable flag**: Certain tasks must be scheduled regardless of time constraints
+- **Preferred times**: Tasks with specific time preferences are prioritized accordingly
+- **Task duration**: Each task has a fixed duration that must fit in remaining time
+- **Recurring task frequency**: Only tasks due for the specific date are considered
+- **Behavioral incompatibilities**: Some task combinations (back-to-back walks, PLAY/FEED too close together) are flagged as conflicts
+
+I decided that priority and non-negotiable status mattered most because pet care involves critical health and safety needs that can't be skipped. Time constraints are secondary but still essential for realistic planning. Behavioral conflicts are treated as warnings rather than hard blocks, since they're based on general guidelines rather than absolute rules.
 
 **b. Tradeoffs**
+One tradeoff in the project is time budget instead of real time slots
+The scheduler subtracts blocked windows from the total available time, but never checks whether a specific task's preferred time actually falls inside a blocked window. So a task set for 10:30am can still appear in the plan even if 9am–12pm is blocked.
+This was a deliberate simplification, because  building a true timeline scheduler would have been a much bigger and more complex system to build. The budget approach is good enough for a first version, but it means the plan can be technically valid while still being practically wrong for the owner's actual day. The downside is that the plan can look slightly inconsistent: it respects how much time is blocked, but not which specific times are blocked.
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
 
----
 
 ## 3. AI Collaboration
 

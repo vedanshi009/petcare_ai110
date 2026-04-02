@@ -41,3 +41,13 @@ pip install -r requirements.txt
 5. Add tests to verify key behaviors.
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
+
+### Smarter Scheduling
+
+- New smart rules spot incompatible task pairs for the same pet:
+  - back-to-back walks are flagged as conflict
+  - play+feed is allowed only if 15+ minutes apart (uses exact time gap)
+
+- The scheduler still uses a fast greedy plan: non-negotiable and high-priority tasks are placed first, then fit what remains.
+
+- Daily load detection is improved: a day is now "tight" when available time is under 180 minutes (less noise, more meaningful warning). 

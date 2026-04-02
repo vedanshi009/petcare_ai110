@@ -55,6 +55,41 @@ def test_mark_completed_changes_status(sample_task):
     sample_task.mark_completed()
     assert sample_task.status == TaskStatus.COMPLETED
 
+def test_mark_completed_creates_next_occurrence():
+    """mark_completed() should trigger create_next_occurrence() for recurring tasks."""
+    from datetime import date
+    # Create a daily recurring task
+    today = date.today()
+    recurring_task = Task(
+        "t_daily", "Morning Walk", "Walk in park",
+        TaskCategory.WALK, TaskPriority.HIGH, 30, "p1",
+        frequency=TaskFrequency.DAILY,
+        non_negotiable=True,
+        due_date=today
+    )
+    assert recurring_task.status == TaskStatus.PENDING
+    
+    # Mark as completed - should return next occurrence
+    next_task = recurring_task.mark_completed()
+    
+    # Verify original task is completed
+    assert recurring_task.status == TaskStatus.COMPLETED
+    
+    # Verify next task was created
+    assert next_task is not None
+    assert next_task.status == TaskStatus.PENDING
+    assert next_task.due_date == (today + __import__('datetime').timedelta(days=1))
+    assert next_task.frequency == TaskFrequency.DAILY
+
+def test_mark_completed_returns_none_for_one_time_task():
+    """mark_completed() should return None for non-recurring tasks."""
+    task = Task("t_once", "One-time bath", "Quick bath",
+                TaskCategory.GROOM, TaskPriority.LOW, 20, "p1",
+                frequency=TaskFrequency.ONCE)
+    next_task = task.mark_completed()
+    assert next_task is None
+    assert task.status == TaskStatus.COMPLETED
+
 def test_mark_skipped_changes_status(sample_task):
     """mark_skipped() sets status to SKIPPED."""
     sample_task.mark_skipped()
@@ -65,6 +100,55 @@ def test_reset_status_returns_to_pending(sample_task):
     sample_task.mark_completed()
     sample_task.reset_status()
     assert sample_task.status == TaskStatus.PENDING
+
+def test_mark_completed_returns_next_task():
+    """mark_completed() should return the next occurrence for a daily task."""
+    from datetime import date, timedelta
+    today = date.today()
+    task = Task("t1", "Walk", "Walk", TaskCategory.WALK, TaskPriority.HIGH,
+                30, "p1", frequency=TaskFrequency.DAILY, due_date=today)
+    next_task = task.mark_completed()
+    assert task.status == TaskStatus.COMPLETED
+    assert next_task is not None
+    assert next_task.due_date == today + timedelta(days=1)
+
+
+# ── Task: create_next_occurrence ──────────────────────────────────────────────
+
+def test_create_next_occurrence_daily():
+    """Daily task should produce a new task due tomorrow."""
+    from datetime import date, timedelta
+    today = date.today()
+    task = Task("t1", "Walk", "Walk", TaskCategory.WALK, TaskPriority.HIGH,
+                30, "p1", frequency=TaskFrequency.DAILY, due_date=today)
+    next_task = task.create_next_occurrence()
+    assert next_task is not None
+    assert next_task.due_date == today + timedelta(days=1)
+    assert next_task.status == TaskStatus.PENDING
+
+def test_create_next_occurrence_weekly():
+    """Weekly task should produce a new task due in 7 days."""
+    from datetime import date, timedelta
+    today = date.today()
+    task = Task("t1", "Groom", "Brush", TaskCategory.GROOM, TaskPriority.LOW,
+                20, "p1", frequency=TaskFrequency.WEEKLY, due_date=today)
+    next_task = task.create_next_occurrence()
+    assert next_task.due_date == today + timedelta(weeks=1)
+
+def test_create_next_occurrence_once_returns_none():
+    """ONCE task should not produce a next occurrence."""
+    from datetime import date
+    today = date.today()
+    task = Task("t1", "Vet", "Vet visit", TaskCategory.HEALTH_CHECK,
+                TaskPriority.HIGH, 60, "p1",
+                frequency=TaskFrequency.ONCE, due_date=today)
+    assert task.create_next_occurrence() is None
+
+def test_create_next_occurrence_no_due_date_returns_none():
+    """Task with no due_date set should return None."""
+    task = Task("t1", "Walk", "Walk", TaskCategory.WALK, TaskPriority.HIGH,
+                30, "p1", frequency=TaskFrequency.DAILY, due_date=None)
+    assert task.create_next_occurrence() is None
 
 
 # ── Task: other methods ───────────────────────────────────────────────────────
@@ -172,3 +256,36 @@ def test_scheduler_tight_day_flag():
 def test_scheduler_not_tight_day():
     constraints = DayConstraints(available_minutes=480)
     assert constraints.is_tight_day() is False
+
+
+# ── Sorting and filtering tests ───────────────────────────────────────────────
+
+def test_sort_by_time_orders_correctly(owner_with_pets):
+    """Tasks with earlier preferred_time should come first."""
+    scheduler = Scheduler(owner_with_pets)
+    tasks = [
+        Task("t1", "Late task",  "desc", TaskCategory.PLAY, TaskPriority.LOW,
+             10, "p1", preferred_time="14:00"),
+        Task("t2", "Early task", "desc", TaskCategory.FEED, TaskPriority.HIGH,
+             10, "p1", preferred_time="07:00"),
+        Task("t3", "No time",    "desc", TaskCategory.GROOM, TaskPriority.LOW,
+             10, "p1", preferred_time=None),
+    ]
+    sorted_tasks = scheduler.sort_by_time(tasks)
+    assert sorted_tasks[0].name == "Early task"  # 07:00 comes first
+    assert sorted_tasks[1].name == "No time"     # None defaults to 12:00 (noon)
+    assert sorted_tasks[2].name == "Late task"   # 14:00 comes last
+
+def test_filter_by_status(owner_with_pets):
+    """get_tasks_by_status should return only tasks with matching status."""
+    all_tasks = owner_with_pets.get_all_tasks()
+    all_tasks[0].mark_completed()
+    completed = owner_with_pets.get_tasks_by_status(TaskStatus.COMPLETED)
+    assert len(completed) == 1
+    assert all(t.status == TaskStatus.COMPLETED for t in completed)
+
+def test_filter_by_pet_name(owner_with_pets):
+    """get_tasks_by_pet_name should return only that pet's tasks."""
+    tasks = owner_with_pets.get_tasks_by_pet_name("Whiskers")
+    assert len(tasks) == 2
+    assert all(t.pet_id == "p2" for t in tasks)
