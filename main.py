@@ -3,10 +3,10 @@ main.py — PawPal+ daily schedule demo.
 Run with: python main.py
 """
 
-from datetime import date
+from datetime import date, timedelta
 from pawpal_system import (
     Owner, Pet, Task,
-    TaskCategory, TaskPriority, TaskFrequency,
+    TaskCategory, TaskPriority, TaskFrequency, TaskStatus,
     DayConstraints, EnergyLevel, Scheduler,
 )
 
@@ -37,48 +37,68 @@ def main():
         owner.add_pet(pet)
 
     # ── Tasks — Dog ──────────────────────────────────────────────────────────
+    # Added out of order to demonstrate sorting
+    today = date.today()
+    dog.add_task(Task("t003", "Play Session",  "Fetch in backyard",
+                      TaskCategory.PLAY,         TaskPriority.MEDIUM, 30, dog.id,
+                      preferred_time="14:00", due_date=today))
+
     dog.add_task(Task("t001", "Morning Walk",  "1-hour park walk",
                       TaskCategory.WALK,         TaskPriority.HIGH,   60, dog.id,
-                      TaskFrequency.DAILY, non_negotiable=True, preferred_hour=8))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_time="08:00", due_date=today))
+
+    # For weekly, set due_date to next Monday
+    days_to_monday = ((7 - today.weekday()) % 7) or 7
+    weekly_due = today + timedelta(days=days_to_monday)
+    dog.add_task(Task("t004", "Grooming",      "Brush fur, check for parasites",
+                      TaskCategory.GROOM,        TaskPriority.MEDIUM, 20, dog.id,
+                      TaskFrequency.WEEKLY, preferred_time="10:00", due_date=weekly_due))
 
     dog.add_task(Task("t002", "Breakfast",     "Kibble and fresh water",
                       TaskCategory.FEED,         TaskPriority.HIGH,   15, dog.id,
-                      TaskFrequency.DAILY, non_negotiable=True, preferred_hour=7))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_time="07:00", due_date=today))
 
-    dog.add_task(Task("t003", "Play Session",  "Fetch in backyard",
-                      TaskCategory.PLAY,         TaskPriority.MEDIUM, 30, dog.id,
-                      preferred_hour=14))
+    # ── TIME CONFLICT DEMO: Add overlapping tasks to detect scheduling conflicts ──
+    # These tasks intentionally overlap at the same time to test time conflict detection
+    dog.add_task(Task("t012", "Training Session", "Teach 'sit' and 'stay'",
+                      TaskCategory.PLAY,         TaskPriority.MEDIUM, 25, dog.id,
+                      preferred_time="14:00", due_date=today))
 
-    dog.add_task(Task("t004", "Grooming",      "Brush fur, check for parasites",
+    dog.add_task(Task("t013", "Nail Trimming",    "Trim nails, check paws",
                       TaskCategory.GROOM,        TaskPriority.MEDIUM, 20, dog.id,
-                      TaskFrequency.WEEKLY, preferred_hour=10))
+                      preferred_time="14:15", due_date=today))
 
     # ── Tasks — Cat ──────────────────────────────────────────────────────────
+    # Added out of order
+    cat.add_task(Task("t008", "Play Time",     "Laser pointer",
+                      TaskCategory.PLAY,         TaskPriority.LOW,    15, cat.id,
+                      preferred_time="16:00", due_date=today))
+
     cat.add_task(Task("t005", "Breakfast",     "Wet food",
                       TaskCategory.FEED,         TaskPriority.HIGH,   10, cat.id,
-                      TaskFrequency.DAILY, non_negotiable=True))
-
-    cat.add_task(Task("t006", "Litter Box",    "Clean and refill",
-                      TaskCategory.HEALTH_CHECK, TaskPriority.MEDIUM, 10, cat.id))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_time="07:30", due_date=today))
 
     cat.add_task(Task("t007", "Medication",    "Digestive aid with meal",
                       TaskCategory.MEDICATION,   TaskPriority.HIGH,    5, cat.id,
-                      TaskFrequency.DAILY, non_negotiable=True))
+                      TaskFrequency.DAILY, non_negotiable=True, preferred_time="07:35", due_date=today))
 
-    cat.add_task(Task("t008", "Play Time",     "Laser pointer",
-                      TaskCategory.PLAY,         TaskPriority.LOW,    15, cat.id))
+    cat.add_task(Task("t006", "Litter Box",    "Clean and refill",
+                      TaskCategory.HEALTH_CHECK, TaskPriority.MEDIUM, 10, cat.id,
+                      preferred_time="09:00", due_date=today))
 
     # ── Tasks — Rabbit ───────────────────────────────────────────────────────
+    # Added out of order
+    rabbit.add_task(Task("t011", "Health Check","Check for illness or injury",
+                         TaskCategory.HEALTH_CHECK, TaskPriority.MEDIUM, 10, rabbit.id,
+                         preferred_time="15:00", due_date=today))
+
     rabbit.add_task(Task("t009", "Breakfast",   "Fresh hay and veg",
                          TaskCategory.FEED,         TaskPriority.HIGH,   15, rabbit.id,
-                         TaskFrequency.DAILY, non_negotiable=True))
+                         TaskFrequency.DAILY, non_negotiable=True, preferred_time="08:00", due_date=today))
 
     rabbit.add_task(Task("t010", "Outdoor Time","Garden enclosure",
                          TaskCategory.PLAY,         TaskPriority.HIGH,   45, rabbit.id,
-                         TaskFrequency.DAILY, non_negotiable=True))
-
-    rabbit.add_task(Task("t011", "Health Check","Check for illness or injury",
-                         TaskCategory.HEALTH_CHECK, TaskPriority.MEDIUM, 10, rabbit.id))
+                         TaskFrequency.DAILY, non_negotiable=True, preferred_time="10:00", due_date=today))
 
     # ── Owner summary ────────────────────────────────────────────────────────
     section("OWNER SUMMARY")
@@ -86,7 +106,7 @@ def main():
     print(f"Pets  : {owner.pet_count()}")
     print(f"Tasks : {owner.total_task_count()} total")
     for pet in owner.pets:
-        note = f"  [!] {pet.health_notes}" if pet.health_notes else ""
+        note = f"  ⚠  {pet.health_notes}" if pet.health_notes else ""
         print(f"  {pet.name:10} {pet.species:8} {pet.age_label():8} "
               f"{pet.task_count()} tasks{note}")
 
@@ -101,12 +121,45 @@ def main():
     # ── Build plan ───────────────────────────────────────────────────────────
     constraints = DayConstraints(
         available_minutes=480,
-        blocked_windows=[(120, 180)],  # 2pm-3pm blocked (meeting, etc.)
         energy_level=EnergyLevel.NORMAL,
-        special_notes="Standard day — all pets healthy (blocked 2-3pm)",
+        special_notes="Standard day — all pets healthy",
     )
 
     scheduler = Scheduler(owner)
+
+    # ── Demonstrate sorting and filtering ────────────────────────────────────
+    section("ALL TASKS SORTED BY TIME")
+    all_tasks = owner.get_all_tasks()
+    sorted_tasks = scheduler.sort_by_time(all_tasks)
+    for task in sorted_tasks:
+        pet = owner.get_pet(task.pet_id)
+        time_str = f" ({task.preferred_time})" if task.preferred_time else " (anytime)"
+        print(f"  {pet.name:10} {task.name:20} {task.status.value:10}{time_str}")
+
+    section("FILTERED: PENDING TASKS ONLY")
+    pending_tasks = owner.get_pending_tasks()
+    sorted_pending = scheduler.sort_by_time(pending_tasks)
+    for task in sorted_pending:
+        pet = owner.get_pet(task.pet_id)
+        time_str = f" ({task.preferred_time})" if task.preferred_time else " (anytime)"
+        print(f"  {pet.name:10} {task.name:20}{time_str}")
+
+    section("FILTERED BY PET NAME: Whiskers")
+    whiskers_tasks = owner.get_tasks_by_pet_name("Whiskers")
+    for task in whiskers_tasks:
+        pref = task.preferred_time if task.preferred_time else "(anytime)"
+        print(f"  {task.name:20} {task.status.value:10} {pref}")
+
+    # Mark one task complete and show status-filtered results
+    task_to_complete = whiskers_tasks[0] if whiskers_tasks else None
+    if task_to_complete:
+        scheduler.reschedule_task(task_to_complete.id, TaskStatus.COMPLETED)
+
+    section("FILTERED BY STATUS: COMPLETED")
+    completed_tasks = owner.get_tasks_by_status(TaskStatus.COMPLETED)
+    for task in completed_tasks:
+        print(f"  {task.name:20} {task.pet_id:10} {task.due_date or 'no due date'}")
+
     plan = scheduler.build_plan(date.today(), constraints)
 
     # ── Print schedule ───────────────────────────────────────────────────────
@@ -122,6 +175,21 @@ def main():
         pet_tasks = plan.get_tasks_for_pet(pet.id)
         if not pet_tasks:
             continue
+        # Sort tasks by preferred time (earliest first), then by priority
+        def time_to_minutes(time_str):
+            if time_str is None:
+                return 12 * 60
+            try:
+                h, m = map(int, time_str.split(':'))
+                return h * 60 + m
+            except:
+                return 12 * 60
+        
+        pet_tasks.sort(key=lambda t: (
+            time_to_minutes(t.preferred_time),
+            0 if t.priority == TaskPriority.HIGH else 1 if t.priority == TaskPriority.MEDIUM else 2,
+            t.name
+        ))
         subtotal = sum(t.duration for t in pet_tasks)
         print(f"\n  {pet.name} ({pet.species}, {pet.age_label()})")
         for task in pet_tasks:
@@ -136,18 +204,15 @@ def main():
     print(f"  Scheduled : {plan.scheduled_count()} tasks  |  {used} min used  |  "
           f"{constraints.available_minutes - used} min remaining")
 
-    # Show conflicts if any detected
-    if plan.has_conflicts():
-        print(f"\n  [CONFLICTS DETECTED]:")
-        for t1, t2 in plan.conflicts:
-            pet = owner.get_pet(t1.pet_id)
-            print(f"    • {pet.name}: '{t1.name}' + '{t2.name}' may cause issues")
-
     if plan.skipped_tasks:
         print(f"\n  Deferred ({plan.skipped_count()} tasks):")
         for task in plan.skipped_tasks:
             pet = owner.get_pet(task.pet_id)
             print(f"    - [{pet.name}] {task.name} ({task.duration} min)")
+
+    if plan.has_conflicts():
+        print(f"\n  Conflicts detected:")
+        print(plan.conflict_summary())
 
     print(f"\n{HDR}")
     print("  Done — schedule printed successfully.")
