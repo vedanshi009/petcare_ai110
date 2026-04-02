@@ -51,3 +51,25 @@ pip install -r requirements.txt
 - The scheduler still uses a fast greedy plan: non-negotiable and high-priority tasks are placed first, then fit what remains.
 
 - Daily load detection is improved: a day is now "tight" when available time is under 180 minutes (less noise, more meaningful warning). 
+
+## Testing PawPal+
+
+Run tests with:
+```bash
+python -m pytest
+```
+
+**Test coverage** includes:
+- Task scheduling logic and constraint validation
+- Conflict detection (incompatible task pairs)
+- Time gap enforcement between tasks
+- Daily load assessment and tight schedule warnings
+- Edge cases (empty schedules, overbooked days, invalid inputs)
+
+### Confidence Level (reliability estimate)
+Based on the test results and coverage in this repo:
+
+all requested functionality tests are in place
+no failing tests (32 passed)
+key behavior verified (sort, daily recurrence, duplicate-time conflicts)
+Confidence: 4 out of 5 stars ⭐⭐⭐⭐

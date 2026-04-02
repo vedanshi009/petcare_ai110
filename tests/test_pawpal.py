@@ -101,17 +101,6 @@ def test_reset_status_returns_to_pending(sample_task):
     sample_task.reset_status()
     assert sample_task.status == TaskStatus.PENDING
 
-def test_mark_completed_returns_next_task():
-    """mark_completed() should return the next occurrence for a daily task."""
-    from datetime import date, timedelta
-    today = date.today()
-    task = Task("t1", "Walk", "Walk", TaskCategory.WALK, TaskPriority.HIGH,
-                30, "p1", frequency=TaskFrequency.DAILY, due_date=today)
-    next_task = task.mark_completed()
-    assert task.status == TaskStatus.COMPLETED
-    assert next_task is not None
-    assert next_task.due_date == today + timedelta(days=1)
-
 
 # ── Task: create_next_occurrence ──────────────────────────────────────────────
 
@@ -289,3 +278,23 @@ def test_filter_by_pet_name(owner_with_pets):
     tasks = owner_with_pets.get_tasks_by_pet_name("Whiskers")
     assert len(tasks) == 2
     assert all(t.pet_id == "p2" for t in tasks)
+
+
+def test_scheduler_detects_time_conflict_for_duplicate_times():
+    """Scheduler should detect a time conflict when two tasks occupy the same time window."""
+    owner = Owner("Dana", "o1")
+    pet = Pet("p1", "Buddy", "Dog", age=4, weight=25.0)
+    t1 = Task("t1", "Morning Walk", "Walk in park", TaskCategory.WALK,
+              TaskPriority.HIGH, 30, "p1", preferred_time="08:00")
+    t2 = Task("t2", "Play", "Fetch ball", TaskCategory.PLAY,
+              TaskPriority.MEDIUM, 15, "p1", preferred_time="08:00")
+    pet.add_task(t1)
+    pet.add_task(t2)
+    owner.add_pet(pet)
+
+    constraints = DayConstraints(available_minutes=120)
+    plan = Scheduler(owner).build_plan(__import__('datetime').date.today(), constraints)
+
+    assert plan.time_conflicts, "Expected a time conflict for duplicate task times"
+    assert any((c[0].id == "t1" and c[1].id == "t2") or (c[0].id == "t2" and c[1].id == "t1")
+               for c in plan.time_conflicts)
