@@ -112,15 +112,57 @@ if st.button("Generate schedule"):
     owner.add_pet(pet)
 
     # Call the scheduler
+    scheduler = Scheduler(owner)
     constraints = DayConstraints(available_minutes=120)
-    plan = Scheduler(owner).build_plan(date.today(), constraints)
+    plan = scheduler.build_plan(date.today(), constraints)
 
-    # Display the result
-    st.success(f"Scheduled {plan.scheduled_count()} tasks "
-               f"({plan.total_scheduled_minutes()} min)")
-    for task in plan.scheduled_tasks:
-        st.markdown(f"- **{task.name}** — {task.priority.value} — {task.duration} min")
+    # Summary badge
+    st.success(
+        f"Scheduled {plan.scheduled_count()} task(s) ({plan.total_scheduled_minutes()} min) "
+        f"for {owner.name} and {owner.pet_count()} pet(s)."
+    )
 
+    # Report any conflicts with helpful details
+    if plan.has_conflicts():
+        st.warning("⚠ Task conflict detected: please adjust timing or tasks below.")
+        st.text(plan.conflict_summary())
+    else:
+        st.success("✅ No task conflicts detected. Your plan looks balanced.")
+
+    # Sorted scheduled tasks table (by preferred time)
+    if plan.scheduled_tasks:
+        st.subheader("Scheduled Tasks")
+        scheduled_sorted = scheduler.sort_by_time(plan.scheduled_tasks)
+        scheduled_rows = []
+        for task in scheduled_sorted:
+            pet = owner.get_pet(task.pet_id)
+            scheduled_rows.append({
+                "Pet": pet.name if pet else task.pet_id,
+                "Task": task.name,
+                "Category": task.category.value,
+                "Priority": task.priority.value,
+                "Duration (min)": task.duration,
+                "Preferred time": task.preferred_time or "Anytime",
+                "Non-negotiable": "Yes" if task.non_negotiable else "No",
+            })
+        st.table(scheduled_rows)
+    else:
+        st.info("No tasks were scheduled for today. Adjust constraints or add tasks.")
+
+    # Skipped tasks
     if plan.skipped_tasks:
-        st.warning(f"{plan.skipped_count()} task(s) skipped — not enough time")
+        st.warning(f"{plan.skipped_count()} task(s) skipped due to time limits or constraints.")
+        skipped_rows = []
+        for task in scheduler.prioritize_tasks(plan.skipped_tasks):
+            pet = owner.get_pet(task.pet_id)
+            skipped_rows.append({
+                "Pet": pet.name if pet else task.pet_id,
+                "Task": task.name,
+                "Category": task.category.value,
+                "Priority": task.priority.value,
+                "Duration (min)": task.duration,
+                "Preferred time": task.preferred_time or "Anytime",
+            })
+        st.table(skipped_rows)
+
         

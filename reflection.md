@@ -58,12 +58,17 @@ This was a deliberate simplification, because  building a true timeline schedule
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+I used AI tools to help explain what the code was doing, to improve and optimise the code for performance, help brainstorm ideas for new features and review and critique the code. 
 - What kinds of prompts or questions were most helpful?
+The prompts that were specific and to the point quesitons were most helpful as they gave efficient outputs. Also questions like "Give a critique of this code, say what responsibilities are missing or redundant."
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
+One moment when I did not accept the suggestion was when I asked Copilot to review the code and optimize it and make it more efficient for performance and space. It gave a complicated version of a simple algorithm that was harder to grasp and unneccessarily long, so I rejected that output.
+
 - How did you evaluate or verify what the AI suggested?
+By going through the code and understanding it myself, or by asking it to review it again.
 
 ---
 
@@ -72,13 +77,16 @@ This was a deliberate simplification, because  building a true timeline schedule
 **a. What you tested**
 
 - What behaviors did you test?
+Task completion status changes, adding tasks to pets, priority logic, scheduler time budgeting, and filtering tasks by status and pet name.
 - Why were these tests important?
+These are the core actions the app depends on — if any of them silently break, the entire daily plan becomes wrong without any visible error.
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+Confident for normal cases but less confident around edge cases. 
 - What edge cases would you test next if you had more time?
-
+I would test tasks that together exceed the available time, and a recurring task completing on the last day of a month.
 ---
 
 ## 5. Reflection
@@ -86,11 +94,15 @@ This was a deliberate simplification, because  building a true timeline schedule
 **a. What went well**
 
 - What part of this project are you most satisfied with?
+The recurring task logic, create_next_occurrence() using timedelta feels like a genuinely useful real-world feature, not just an exercise.
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
 
+Replace the greedy scheduler with one that reserves time for non-negotiable tasks first before filling the rest, so critical tasks can never get bumped.
+
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+AI is useful when you already know what you want to build, but asking it to design something from scratch produces code you don't fully understand or trust.

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PawPal+ UML Class Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .diagram-container {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .instructions {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-left: 4px solid #0288d1;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .save-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .save-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 PawPal+ UML Class Diagram</h1>
+        <div class="instructions">
+            <strong>💡 To save as PNG:</strong> Right-click on the diagram → "Save image as..." 
+            or use your browser's screenshot tool to capture the diagram.
+        </div>
+        
+        <div class="diagram-container">
+            <div class="mermaid">
+classDiagram
+    class Owner {
+        -name: str
+        -owner_id: str
+        -pets: Pet[]
+        +add_pet(pet: Pet) void
+        +remove_pet(pet_id: str) bool
+        +get_pet(pet_id: str) Optional~Pet~
+        +get_all_tasks() Task[]
+        +get_pending_tasks() Task[]
+        +get_high_priority_tasks() Task[]
+        +pet_count() int
+        +total_task_count() int
+        +get_tasks_by_status(status: TaskStatus) Task[]
+        +get_tasks_by_pet_name(pet_name: str) Task[]
+    }
+
+    class Pet {
+        -id: str
+        -name: str
+        -species: str
+        -age: int
+        -weight: float
+        -health_notes: Optional~str~
+        -tasks: Task[]
+        +age_label() str
+        +add_task(task: Task) void
+        +mark_task_completed(task_id: str) bool
+        +get_pending_tasks() Task[]
+        +get_high_priority_tasks() Task[]
+        +task_count() int
+    }
+
+    class Task {
+        -id: str
+        -name: str
+        -description: str
+        -category: TaskCategory
+        -priority: TaskPriority
+        -duration: int
+        -pet_id: str
+        -frequency: TaskFrequency
+        -non_negotiable: bool
+        -status: TaskStatus
+        -preferred_time: Optional~str~
+        -due_date: Optional~date~
+        +is_high_priority() bool
+        +fits_in(minutes: int) bool
+        +summary() str
+        +mark_completed() Optional~Task~
+        +mark_skipped() void
+        +reset_status() void
+        +create_next_occurrence() Optional~Task~
+    }
+
+    class DayConstraints {
+        -available_minutes: int
+        -blocked_windows: list~Tuple~
+        -energy_level: EnergyLevel
+        -special_notes: Optional~str~
+        +is_tight_day() bool
+        +to_prompt_str() str
+    }
+
+    class DailyPlan {
+        -date: date
+        -pets: Pet[]
+        -constraints: DayConstraints
+        -scheduled_tasks: Task[]
+        -skipped_tasks: Task[]
+        -conflicts: Tuple~Task, Task~[]
+        -time_conflicts: Tuple~Task, Task~[]
+        +skipped_count() int
+        +scheduled_count() int
+        +total_scheduled_minutes() int
+        +is_valid() bool
+        +add_task(task: Task, skip: bool) void
+        +get_tasks_for_pet(pet_id: str) Task[]
+        +has_conflicts() bool
+        +conflict_summary() str
+    }
+
+    class Scheduler {
+        -owner: Owner
+        +get_available_tasks() Task[]
+        +prioritize_tasks(tasks: Task[]) Task[]
+        +sort_by_time(tasks: Task[]) Task[]
+        +should_run_today(task: Task, plan_date: date) bool
+        +detect_conflicts(plan: DailyPlan) Tuple~Task, Task~[]
+        +detect_time_conflicts(plan: DailyPlan) Tuple~Task, Task~[]
+        +build_plan(date_for_plan: date, constraints: DayConstraints) DailyPlan
+        +get_tasks_by_pet(pet_id: str) Task[]
+        +reschedule_task(task_id: str, new_status: TaskStatus) bool
+    }
+
+    class TaskFrequency {
+        <<enumeration>>
+        ONCE
+        DAILY
+        WEEKLY
+        MONTHLY
+    }
+
+    class TaskStatus {
+        <<enumeration>>
+        PENDING
+        COMPLETED
+        SKIPPED
+    }
+
+    class TaskPriority {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+    }
+
+    class TaskCategory {
+        <<enumeration>>
+        WALK
+        FEED
+        GROOM
+        MEDICATION
+        PLAY
+        HEALTH_CHECK
+    }
+
+    class EnergyLevel {
+        <<enumeration>>
+        LOW
+        NORMAL
+        HIGH
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Task --> TaskFrequency : frequency
+    Task --> TaskStatus : status
+    Task --> TaskPriority : priority
+    Task --> TaskCategory : category
+    Scheduler "1" --> "1" Owner : schedules_for
+    Scheduler --> DailyPlan : creates
+    DailyPlan "1" --> "1" DayConstraints : created_with
+    DailyPlan "1" --> "*" Task : schedules/skips
+    DailyPlan "1" --> "*" Pet : plans_for
+    DayConstraints --> EnergyLevel : has
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        mermaid.contentLoaderAsync();
+    </script>
+</body>
+</html>
